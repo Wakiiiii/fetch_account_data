@@ -42,11 +42,11 @@ def dispatch_request(http_method):
 
 
 def send_signed_request(http_method, url_path, payload=None):
-    # send signed request to binance
+    # Send signed request to binance
     if payload is None:
         payload = {}
     query_string = urlencode(payload)
-    # replace single quote to double quote
+    # Replace single quote to double quote
     query_string = query_string.replace("%27", "%22")
     if query_string:
         query_string = "{}&timestamp={}".format(query_string, get_timestamp())
@@ -120,7 +120,7 @@ def enable_widgets():
     fetch_button.config(state="normal")
 
 def fetch_symbols():
-    # fetch all symbols from binance futures
+    # Fetch all symbols from binance futures
     all_symbols = []
     response= send_signed_request("GET", "/fapi/v1/exchangeInfo")
     response = response.json()
