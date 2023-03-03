@@ -71,6 +71,8 @@ def verify_keys():
          message_label.config(text="Server side error", fg="red")
     else:
          message_label.config(text="Keys are not valid", fg="red")
+         json_file_button.config(state="disabled")
+         fetch_button.config(state="disabled")
 
 
 def check_fields(event):
