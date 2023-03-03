@@ -13,7 +13,9 @@ ALIAS = None
 
 def hashing(query_string):
     return hmac.new(
-        SECRET_KEY.encode("utf-8"), query_string.encode("utf-8"), hashlib.sha256
+        SECRET_KEY.encode("utf-8"),
+        query_string.encode("utf-8"),
+        hashlib.sha256
     ).hexdigest()
 
 
@@ -24,7 +26,8 @@ def get_timestamp():
 def dispatch_request(http_method):
     session = requests.Session()
     session.headers.update(
-        {"Content-Type": "application/json;charset=utf-8", "X-MBX-APIKEY": API_KEY}
+        {"Content-Type": "application/json;charset=utf-8",
+          "X-MBX-APIKEY": API_KEY}
     )
 
     return {
@@ -56,11 +59,16 @@ def send_signed_request(http_method, url_path, payload=None):
 
 
 def verify_keys():
+    global ALIAS
     response = send_signed_request("GET", "/fapi/v2/balance")
     if response.status_code == 200:
         message_label.config(text="")
+        response.json()
+        ALIAS = response[0]["accountAlias"]
     elif response.status_code >= 500:
-         message_label.config(text="An error occured on Binance's side", fg="red")
+         message_label.config(
+             text="An error occured on Binance's side", fg="red"
+             )
     else:
          message_label.config(text="Keys are not valid", fg="red")
 
