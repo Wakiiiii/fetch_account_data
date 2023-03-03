@@ -103,7 +103,7 @@ def import_json():
             json_file_button.config(text=json_file_name.split("/")[-1])
 
 
-# Create window and set title
+# Create window & set title
 window = tk.Tk()
 window.title("Fetch Account Data")
 
@@ -143,9 +143,9 @@ message_label.grid(row=4, column=1, columnspan=2, padx=5, pady=5)
 json_file_button.config(state="disabled")
 fetch_button.config(state="disabled")
 
-# Bind the function to the KeyRelease event of the Entry widgets
+# Bind function to KeyRelease event of Entry widgets
 api_key_line.bind("<KeyRelease>", check_fields)
 secret_key_line.bind("<KeyRelease>", check_fields)
 
-# Start the event loop
+# Start event loop
 window.mainloop()
