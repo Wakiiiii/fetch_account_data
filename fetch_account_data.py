@@ -60,13 +60,16 @@ def send_signed_request(http_method, url_path, payload=None):
 
 def verify_keys():
     global ALIAS
+    # Check if keys match binance futures account
     response = send_signed_request("GET", "/fapi/v2/balance")
+    # Successful
     if response.status_code == 200:
         message_label.config(text="")
         response = response.json()
         ALIAS = response[0]["accountAlias"]
         json_file_button.config(state="normal")
         fetch_button.config(state="normal")
+    # Unsuccessful
     elif response.status_code >= 500:
          message_label.config(text="Server side error", fg="red")
     else:
