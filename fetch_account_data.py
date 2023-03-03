@@ -119,6 +119,13 @@ def enable_widgets():
     import_button.config(state="normal")
     fetch_button.config(state="normal")
 
+
+def done():
+    # Create done button (exit)
+    done_button = tk.Button(window, text="Done", command=window.destroy)
+    done_button.grid(row=4, column=1, columnspan=2, padx=5, pady=5)
+    done_button.config(state="normal")
+
 def fetch_symbols():
     # Fetch all symbols from binance futures
     all_symbols = []
@@ -133,6 +140,7 @@ def fetch_data():
     all_symbols = fetch_symbols()
     print(all_symbols)
     enable_widgets()
+    done()
 
 
 # Create window & set title
@@ -168,7 +176,7 @@ import_button.grid(row=2, column=1, padx=0, pady=0)
 fetch_button = tk.Button(window, text="Fetch Data", fg="red", command=fetch_data)
 fetch_button.grid(row=3, column=1, padx=5, pady=5)
 
-message_label = tk.Label(window, text="", fg="black")
+message_label = tk.Label(window, text="")
 message_label.grid(row=4, column=1, columnspan=2, padx=5, pady=5)
 
 # Disable the import & fetch buttons initially
