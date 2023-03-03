@@ -4,6 +4,7 @@ import hmac
 import requests
 import time
 import json
+import os
 from urllib.parse import urlencode
 from tkinter import filedialog
 
@@ -120,11 +121,24 @@ def enable_widgets():
     fetch_button.config(state="normal")
 
 
+def create_json_file(content=None):
+    # Get user desktop path
+    desktop_path = os.path.join(os.path.expanduser("~"), "Desktop")
+    # Create new json file on desktop
+    file_name = "{}.json".format(str(time.time()).replace(".", ""))
+    file_path = os.path.join(desktop_path, file_name)
+    # Dump content
+    with open(file_path, "w") as file:
+        json.dump(content, file)
+    print("JSON file created: {}".format(file_path))
+
+
 def done():
     # Create done button (exit)
     done_button = tk.Button(window, text="Done", command=window.destroy)
     done_button.grid(row=4, column=1, columnspan=2, padx=5, pady=5)
     done_button.config(state="normal")
+
 
 def fetch_symbols():
     # Fetch all symbols from binance futures
@@ -135,11 +149,12 @@ def fetch_symbols():
         all_symbols.append({"symbol": i["symbol"], "time": i["onboardDate"]})
     return all_symbols
 
+
 def fetch_data():
     disable_widgets()
     all_symbols = fetch_symbols()
-    print(all_symbols)
     enable_widgets()
+    create_json_file()
     done()
 
 
