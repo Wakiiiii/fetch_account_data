@@ -3,7 +3,9 @@ import hashlib
 import hmac
 import requests
 import time
+import json
 from urllib.parse import urlencode
+from tkinter import filedialog
 
 
 API_KEY = None
@@ -86,6 +88,20 @@ def check_fields(event):
         SECRET_KEY = secret_key_line.get()
         verify_keys()
 
+def import_json():
+    # Get the filename of the selected JSON file
+    filename = filedialog.askopenfilename(
+        filetypes=[("JSON files", "*.json")]
+        )
+    if filename:
+        json_file_name = filename
+        # Open the file and read its contents as a JSON object
+        with open(filename) as file:
+            json_data = json.load(file)
+            print(json_data)
+            # Modify the text of the button to display the name of the file
+            json_file_button.config(text=json_file_name.split("/")[-1])
+
 
 # Create the window and set its title
 window = tk.Tk()
@@ -114,7 +130,7 @@ secret_key_line.grid(row=1, column=1, padx=0, pady=0)
 
 json_file_label = tk.Label(window, text='JSON file:')
 json_file_label.grid(row=2, column=0, padx=5, pady=5)
-json_file_button = tk.Button(window, text="Import")
+json_file_button = tk.Button(window, text="Import", command=import_json)
 json_file_button.grid(row=2, column=1, padx=0, pady=0)
 
 fetch_button = tk.Button(window, text="Fetch Data", fg="red")
