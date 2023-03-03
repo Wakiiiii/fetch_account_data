@@ -101,12 +101,12 @@ def import_json():
         # Open file & read content as a JSON object
         with open(filename) as file:
             JSON = json.load(file)
-            # Modify button text to file name
+            # Change button text to file name
             import_button.config(text=json_file_name.split("/")[-1])
 
 
 def disable_widgets():
-    # Disable the entry lines and the import button
+    # Disable all widgets
     api_key_line.config(state="disabled")
     secret_key_line.config(state="disabled")
     import_button.config(state="disabled")
