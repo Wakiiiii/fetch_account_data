@@ -63,12 +63,12 @@ def verify_keys():
     response = send_signed_request("GET", "/fapi/v2/balance")
     if response.status_code == 200:
         message_label.config(text="")
-        response.json()
+        response = response.json()
         ALIAS = response[0]["accountAlias"]
+        json_file_button.config(state="normal")
+        fetch_button.config(state="normal")
     elif response.status_code >= 500:
-         message_label.config(
-             text="An error occured on Binance's side", fg="red"
-             )
+         message_label.config(text="Server side error", fg="red")
     else:
          message_label.config(text="Keys are not valid", fg="red")
 
@@ -109,10 +109,18 @@ secret_key_line.grid(row=1, column=1, padx=0, pady=0)
 
 json_file_label = tk.Label(window, text='JSON file:')
 json_file_label.grid(row=2, column=0, padx=5, pady=5)
+json_file_button = tk.Button(window, text="Import")
+json_file_button.grid(row=2, column=1, padx=0, pady=0)
 
-# Add the message label to the window
+fetch_button = tk.Button(window, text="Fetch Data", fg="red")
+fetch_button.grid(row=3, column=1, padx=5, pady=5)
+
 message_label = tk.Label(window, text="", fg="black")
 message_label.grid(row=4, column=1, columnspan=2, padx=5, pady=5)
+
+# Disable the import and fetch buttons initially
+json_file_button.config(state="disabled")
+fetch_button.config(state="disabled")
 
 # Bind the function to the KeyRelease event of the Entry widgets
 api_key_line.bind("<KeyRelease>", check_fields)
