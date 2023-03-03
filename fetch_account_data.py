@@ -54,12 +54,21 @@ def send_signed_request(http_method, url_path, payload=None):
     return response
 
 
+def verify_keys(api, secret):
+    response = send_signed_request("GET", "/fapi/v2/balance")
+    if response.status_code == 200:
+        print("valid keys")
+    else:
+        print("invalid keys")
+
+
 def check_fields(event):
     global API_KEY, SECRET_KEY
     # Check if both API key and Secret key have values
     if api_key_line.get() and secret_key_line.get():
         API_KEY = api_key_line.get()
         SECRET_KEY = secret_key_line.get()
+        verify_keys(API_KEY, SECRET_KEY)
 
 
 # Create the window and set its title
