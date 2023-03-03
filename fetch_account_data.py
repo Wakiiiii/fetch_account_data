@@ -41,7 +41,7 @@ def dispatch_request(http_method):
 
 
 def send_signed_request(http_method, url_path, payload=None):
-    # sends signed request to binance
+    # send signed request to binance
     if payload is None:
         payload = {}
     query_string = urlencode(payload)
@@ -82,38 +82,38 @@ def verify_keys():
 
 def check_fields(event):
     global API_KEY, SECRET_KEY
-    # Check if both API key and Secret key have values
+    # Check if both API key & Secret key have values
     if api_key_line.get() and secret_key_line.get():
         API_KEY = api_key_line.get()
         SECRET_KEY = secret_key_line.get()
         verify_keys()
 
 def import_json():
-    # Get the filename of the selected JSON file
+    # Get filename of JSON file
     filename = filedialog.askopenfilename(
         filetypes=[("JSON files", "*.json")]
         )
     if filename:
         json_file_name = filename
-        # Open the file and read its contents as a JSON object
+        # Open file & read content as a JSON object
         with open(filename) as file:
             json_data = json.load(file)
             print(json_data)
-            # Modify the text of the button to display the name of the file
+            # Modify button text to file name
             json_file_button.config(text=json_file_name.split("/")[-1])
 
 
-# Create the window and set its title
+# Create window and set title
 window = tk.Tk()
 window.title("Fetch Account Data")
 
-# Get the screen dimensions and calculate the center coordinates
+# Get screen dimensions & calculate center coordinates
 screen_width = window.winfo_screenwidth()
 screen_height = window.winfo_screenheight()
 center_x = int(screen_width / 2 - 150)
 center_y = int(screen_height / 2 - 100)
 
-# Set size and position of the window
+# Set size & window position
 window.geometry(f'300x200+{center_x}+{center_y}')
 window.resizable(0, 0) # Resize OFF
 
@@ -139,7 +139,7 @@ fetch_button.grid(row=3, column=1, padx=5, pady=5)
 message_label = tk.Label(window, text="", fg="black")
 message_label.grid(row=4, column=1, columnspan=2, padx=5, pady=5)
 
-# Disable the import and fetch buttons initially
+# Disable the import & fetch buttons initially
 json_file_button.config(state="disabled")
 fetch_button.config(state="disabled")
 
