@@ -8,6 +8,7 @@ from urllib.parse import urlencode
 
 API_KEY = None
 SECRET_KEY = None
+ALIAS = None
 
 
 def hashing(query_string):
@@ -57,9 +58,11 @@ def send_signed_request(http_method, url_path, payload=None):
 def verify_keys():
     response = send_signed_request("GET", "/fapi/v2/balance")
     if response.status_code == 200:
-        print("valid keys")
+        message_label.config(text="")
+    elif response.status_code >= 500:
+         message_label.config(text="An error occured on Binance's side", fg="red")
     else:
-        print("invalid keys")
+         message_label.config(text="Keys are not valid", fg="red")
 
 
 def check_fields(event):
@@ -83,7 +86,7 @@ center_y = int(screen_height / 2 - 100)
 
 # Set size and position of the window
 window.geometry(f'300x200+{center_x}+{center_y}')
-window.resizable(0, 0)
+window.resizable(0, 0) # Resize OFF
 
 # Add GUI elements
 api_key_label = tk.Label(window, text='API Key:')
@@ -98,6 +101,10 @@ secret_key_line.grid(row=1, column=1, padx=0, pady=0)
 
 json_file_label = tk.Label(window, text='JSON file:')
 json_file_label.grid(row=2, column=0, padx=5, pady=5)
+
+# Add the message label to the window
+message_label = tk.Label(window, text="", fg="black")
+message_label.grid(row=4, column=1, columnspan=2, padx=5, pady=5)
 
 # Bind the function to the KeyRelease event of the Entry widgets
 api_key_line.bind("<KeyRelease>", check_fields)
