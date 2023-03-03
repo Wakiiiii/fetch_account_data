@@ -14,5 +14,15 @@ center_y = int(screen_height / 2 - 100)
 window.geometry(f'300x200+{center_x}+{center_y}')
 window.resizable(0, 0)
 
+# Add GUI elements
+api_key_label = tk.Label(window, text='API Key:')
+api_key_label.grid(row=0, column=0, padx=5, pady=5)
+
+secret_key_label = tk.Label(window, text='Secret Key:')
+secret_key_label.grid(row=1, column=0, padx=5, pady=5)
+
+json_file_label = tk.Label(window, text='JSON file:')
+json_file_label.grid(row=2, column=0, padx=5, pady=5)
+
 # Start the event loop
 window.mainloop()
