@@ -11,6 +11,7 @@ from tkinter import filedialog
 API_KEY = None
 SECRET_KEY = None
 ALIAS = None
+JSON = None
 
 
 def hashing(query_string):
@@ -88,7 +89,9 @@ def check_fields(event):
         SECRET_KEY = secret_key_line.get()
         verify_keys()
 
+
 def import_json():
+    global JSON
     # Get filename of JSON file
     filename = filedialog.askopenfilename(
         filetypes=[("JSON files", "*.json")]
@@ -97,8 +100,7 @@ def import_json():
         json_file_name = filename
         # Open file & read content as a JSON object
         with open(filename) as file:
-            json_data = json.load(file)
-            print(json_data)
+            JSON = json.load(file)
             # Modify button text to file name
             json_file_button.config(text=json_file_name.split("/")[-1])
 
