@@ -147,7 +147,9 @@ def fetch_symbols():
     response = send_signed_request("GET", "/fapi/v1/exchangeInfo")
     response = response.json()
     for i in response["symbols"]:
-        all_symbols.append({"symbol": i["symbol"], "time": i["onboardDate"]})
+        all_symbols.append(
+            {"symbol": i["symbol"], "last_time": i["onboardDate"], "last_orderId": None}
+            )
     return all_symbols
 
 
