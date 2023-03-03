@@ -1,6 +1,7 @@
 # fetch_account_data
 
 1) Create API keys for your binance account (read only)
+   
    How to create API keys:
    https://www.binance.com/en/support/faq/how-to-create-api-360002502072
    
