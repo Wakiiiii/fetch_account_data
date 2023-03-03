@@ -70,14 +70,14 @@ def verify_keys():
         message_label.config(text="")
         response = response.json()
         ALIAS = response[0]["accountAlias"]
-        json_file_button.config(state="normal")
+        import_button.config(state="normal")
         fetch_button.config(state="normal")
     # Unsuccessful
     elif response.status_code >= 500:
          message_label.config(text="Server side error", fg="red")
     else:
          message_label.config(text="Keys are not valid", fg="red")
-         json_file_button.config(state="disabled")
+         import_button.config(state="disabled")
          fetch_button.config(state="disabled")
 
 
@@ -102,7 +102,17 @@ def import_json():
         with open(filename) as file:
             JSON = json.load(file)
             # Modify button text to file name
-            json_file_button.config(text=json_file_name.split("/")[-1])
+            import_button.config(text=json_file_name.split("/")[-1])
+
+def disable_widgets():
+    # Disable the entry lines and the import button
+    api_key_line.config(state="disabled")
+    secret_key_line.config(state="disabled")
+    import_button.config(state="disabled")
+    fetch_button.config(state="disabled")
+
+def fetch_data():
+    disable_widgets()
 
 
 # Create window & set title
@@ -132,17 +142,17 @@ secret_key_line.grid(row=1, column=1, padx=0, pady=0)
 
 json_file_label = tk.Label(window, text='JSON file:')
 json_file_label.grid(row=2, column=0, padx=5, pady=5)
-json_file_button = tk.Button(window, text="Import", command=import_json)
-json_file_button.grid(row=2, column=1, padx=0, pady=0)
+import_button = tk.Button(window, text="Import", command=import_json)
+import_button.grid(row=2, column=1, padx=0, pady=0)
 
-fetch_button = tk.Button(window, text="Fetch Data", fg="red")
+fetch_button = tk.Button(window, text="Fetch Data", fg="red", command=fetch_data)
 fetch_button.grid(row=3, column=1, padx=5, pady=5)
 
 message_label = tk.Label(window, text="", fg="black")
 message_label.grid(row=4, column=1, columnspan=2, padx=5, pady=5)
 
 # Disable the import & fetch buttons initially
-json_file_button.config(state="disabled")
+import_button.config(state="disabled")
 fetch_button.config(state="disabled")
 
 # Bind function to KeyRelease event of Entry widgets
