@@ -31,7 +31,7 @@ def dispatch_request(http_method):
     session = requests.Session()
     session.headers.update(
         {"Content-Type": "application/json;charset=utf-8",
-          "X-MBX-APIKEY": API_KEY}
+         "X-MBX-APIKEY": API_KEY}
     )
 
     return {
@@ -75,11 +75,11 @@ def verify_keys():
         fetch_button.config(state="normal")
     # Unsuccessful
     elif response.status_code >= 500:
-         message_label.config(text="Server side error", fg="red")
+        message_label.config(text="Server side error", fg="red")
     else:
-         message_label.config(text="Keys are not valid", fg="red")
-         import_button.config(state="disabled")
-         fetch_button.config(state="disabled")
+        message_label.config(text="Keys are not valid", fg="red")
+        import_button.config(state="disabled")
+        fetch_button.config(state="disabled")
 
 
 def check_fields(event):
@@ -96,7 +96,7 @@ def import_json():
     # Get filename of JSON file
     filename = filedialog.askopenfilename(
         filetypes=[("JSON files", "*.json")]
-        )
+    )
     if filename:
         json_file_name = filename
         # Open file & read content as a JSON object
@@ -112,6 +112,7 @@ def disable_widgets():
     secret_key_line.config(state="disabled")
     import_button.config(state="disabled")
     fetch_button.config(state="disabled")
+
 
 def enable_widgets():
     # Enable all widgets
@@ -143,7 +144,7 @@ def done():
 def fetch_symbols():
     # Fetch all symbols from binance futures
     all_symbols = []
-    response= send_signed_request("GET", "/fapi/v1/exchangeInfo")
+    response = send_signed_request("GET", "/fapi/v1/exchangeInfo")
     response = response.json()
     for i in response["symbols"]:
         all_symbols.append({"symbol": i["symbol"], "time": i["onboardDate"]})
@@ -170,7 +171,7 @@ center_y = int(screen_height / 2 - 100)
 
 # Set size & window position
 window.geometry(f'300x200+{center_x}+{center_y}')
-window.resizable(0, 0) # Resize OFF
+window.resizable(0, 0)  # Resize OFF
 
 # Add GUI elements
 api_key_label = tk.Label(window, text='API Key:')
@@ -188,7 +189,8 @@ json_file_label.grid(row=2, column=0, padx=5, pady=5)
 import_button = tk.Button(window, text="Import", command=import_json)
 import_button.grid(row=2, column=1, padx=0, pady=0)
 
-fetch_button = tk.Button(window, text="Fetch Data", fg="red", command=fetch_data)
+fetch_button = tk.Button(window, text="Fetch Data",
+                         fg="red", command=fetch_data)
 fetch_button.grid(row=3, column=1, padx=5, pady=5)
 
 message_label = tk.Label(window, text="")
