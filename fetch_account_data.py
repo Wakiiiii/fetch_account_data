@@ -1,4 +1,66 @@
 import tkinter as tk
+import hashlib
+import hmac
+import requests
+import time
+from urllib.parse import urlencode
+
+
+API_KEY = None
+SECRET_KEY = None
+
+
+def hashing(query_string):
+    return hmac.new(
+        SECRET_KEY.encode("utf-8"), query_string.encode("utf-8"), hashlib.sha256
+    ).hexdigest()
+
+
+def get_timestamp():
+    return int(time.time() * 1000)
+
+
+def dispatch_request(http_method):
+    session = requests.Session()
+    session.headers.update(
+        {"Content-Type": "application/json;charset=utf-8", "X-MBX-APIKEY": API_KEY}
+    )
+
+    return {
+        "GET": session.get,
+        "DELETE": session.delete,
+        "PUT": session.put,
+        "POST": session.post,
+    }.get(http_method, "GET")
+
+
+def send_signed_request(http_method, url_path, payload=None):
+    # sends signed request to binance
+    if payload is None:
+        payload = {}
+    query_string = urlencode(payload)
+    # replace single quote to double quote
+    query_string = query_string.replace("%27", "%22")
+    if query_string:
+        query_string = "{}&timestamp={}".format(query_string, get_timestamp())
+    else:
+        query_string = "timestamp={}".format(get_timestamp())
+    url = (
+        "https://fapi.binance.com" + url_path + "?" + query_string
+        + "&signature=" + hashing(query_string)
+    )
+    params = {"url": url, "params": {}}
+    response = dispatch_request(http_method)(**params)
+    return response
+
+
+def check_fields(event):
+    global API_KEY, SECRET_KEY
+    # Check if both API key and Secret key have values
+    if api_key_line.get() and secret_key_line.get():
+        API_KEY = api_key_line.get()
+        SECRET_KEY = secret_key_line.get()
+
 
 # Create the window and set its title
 window = tk.Tk()
@@ -27,6 +89,10 @@ secret_key_line.grid(row=1, column=1, padx=0, pady=0)
 
 json_file_label = tk.Label(window, text='JSON file:')
 json_file_label.grid(row=2, column=0, padx=5, pady=5)
+
+# Bind the function to the KeyRelease event of the Entry widgets
+api_key_line.bind("<KeyRelease>", check_fields)
+secret_key_line.bind("<KeyRelease>", check_fields)
 
 # Start the event loop
 window.mainloop()
