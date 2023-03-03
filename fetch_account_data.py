@@ -104,12 +104,14 @@ def import_json():
             # Modify button text to file name
             import_button.config(text=json_file_name.split("/")[-1])
 
+
 def disable_widgets():
     # Disable the entry lines and the import button
     api_key_line.config(state="disabled")
     secret_key_line.config(state="disabled")
     import_button.config(state="disabled")
     fetch_button.config(state="disabled")
+
 
 def fetch_data():
     disable_widgets()
