@@ -4,7 +4,8 @@
    How to create API keys:
    https://www.binance.com/en/support/faq/how-to-create-api-360002502072
    
-2) Copy-Paste API and Secret keys in the fields
+2) Copy-Paste API and Secret keys in API and Secret keys fields
+   NOTE: keys have to be valid to continue
 
 3) [OPTIONAL] Import json file to start from 
     NOTE: json has to match format or an error will occur
