@@ -112,9 +112,27 @@ def disable_widgets():
     import_button.config(state="disabled")
     fetch_button.config(state="disabled")
 
+def enable_widgets():
+    # Enable all widgets
+    api_key_line.config(state="normal")
+    secret_key_line.config(state="normal")
+    import_button.config(state="normal")
+    fetch_button.config(state="normal")
+
+def fetch_symbols():
+    # fetch all symbols from binance futures
+    all_symbols = []
+    response= send_signed_request("GET", "/fapi/v1/exchangeInfo")
+    response = response.json()
+    for i in response["symbols"]:
+        all_symbols.append({"symbol": i["symbol"], "time": i["onboardDate"]})
+    return all_symbols
 
 def fetch_data():
     disable_widgets()
+    all_symbols = fetch_symbols()
+    print(all_symbols)
+    enable_widgets()
 
 
 # Create window & set title
