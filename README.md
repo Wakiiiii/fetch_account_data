@@ -11,7 +11,7 @@
 
 3) [OPTIONAL] Import json file to start from 
     
-    NOTE: json has to match format or an error will occur
+    NOTE: json has to match format else an error will occur
     
 4) Click Fetch Data (process takes about 1h)
    
