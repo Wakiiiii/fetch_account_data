@@ -156,8 +156,8 @@ def fetch_symbols():
 def fetch_data():
     disable_widgets()
     all_symbols = fetch_symbols()
-    enable_widgets()
     create_json_file()
+    enable_widgets()
     done()
 
 
