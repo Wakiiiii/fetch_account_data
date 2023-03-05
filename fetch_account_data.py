@@ -9,15 +9,15 @@ from urllib.parse import urlencode
 from tkinter import filedialog
 
 
-API_KEY = None
-SECRET_KEY = None
-ALIAS = None
-JSON = None
+api_key = None
+secret_key = None
+alias = None
+json = None
 
 
 def hashing(query_string):
     return hmac.new(
-        SECRET_KEY.encode("utf-8"),
+        secret_key.encode("utf-8"),
         query_string.encode("utf-8"),
         hashlib.sha256
     ).hexdigest()
@@ -31,7 +31,7 @@ def dispatch_request(http_method):
     session = requests.Session()
     session.headers.update(
         {"Content-Type": "application/json;charset=utf-8",
-         "X-MBX-APIKEY": API_KEY}
+         "X-MBX-APIKEY": api_key}
     )
 
     return {
@@ -63,14 +63,14 @@ def send_signed_request(http_method, url_path, payload=None):
 
 
 def verify_keys():
-    global ALIAS
+    global alias
     # Check if keys match binance futures account
     response = send_signed_request("GET", "/fapi/v2/balance")
     # Successful
     if response.status_code == 200:
         message_label.config(text="")
         response = response.json()
-        ALIAS = response[0]["accountAlias"]
+        alias = response[0]["accountAlias"]
         import_button.config(state="normal")
         fetch_button.config(state="normal")
     # Unsuccessful
@@ -83,16 +83,16 @@ def verify_keys():
 
 
 def check_fields(event):
-    global API_KEY, SECRET_KEY
+    global api_key, secret_key
     # Check if both API key & Secret key have values
     if api_key_line.get() and secret_key_line.get():
-        API_KEY = api_key_line.get()
-        SECRET_KEY = secret_key_line.get()
+        api_key = api_key_line.get()
+        secret_key = secret_key_line.get()
         verify_keys()
 
 
 def import_json():
-    global JSON
+    global json
     # Get filename of JSON file
     filename = filedialog.askopenfilename(
         filetypes=[("JSON files", "*.json")]
@@ -101,7 +101,7 @@ def import_json():
         json_file_name = filename
         # Open file & read content as a JSON object
         with open(filename) as file:
-            JSON = json.load(file)
+            json = json.load(file)
             # Change button text to file name
             import_button.config(text=json_file_name.split("/")[-1])
 
@@ -143,19 +143,49 @@ def done():
 
 def fetch_symbols():
     # Fetch all symbols from binance futures
-    all_symbols = []
+    symbols = []
     response = send_signed_request("GET", "/fapi/v1/exchangeInfo")
     response = response.json()
     for i in response["symbols"]:
-        all_symbols.append(
-            {"symbol": i["symbol"], "last_time": i["onboardDate"], "last_orderId": None}
-            )
-    return all_symbols
+        symbols.append(
+            {"symbol": i["symbol"], "last_time": i["onboardDate"]}
+        )
+    return symbols
 
+
+def fetch_orders(symbols, time_max):
+    new_orders = []
+    for i in symbols:
+        symbol = i["symbol"]
+        startTime = i["last_time"]
+        endTime = startTime + (7 * 24 * 60 * 60 * 1000)
+        orderId = None
+        while orderId is None:
+            if endTime > time_max:
+                endTime = time_max
+                orderId = False
+            response = send_signed_request("GET", "/fapi/v1/allOrders",
+                                           {"symbol": symbol, "startTime": startTime,"endTime": endTime, "limit": 1})
+            response = response.json()
+            if len(response) > 0:
+                orderId = response[0]["orderId"]
+            startTime = endTime
+            endTime = startTime + (7 * 24 * 60 * 60 * 1000)
+        while orderId is not False:
+            response = send_signed_request("GET", "/fapi/v1/allOrders",
+                                           {"symbol": symbol, "orderId": orderId, "limit": 1000})
+            response = response.json()
+            new_orders += response
+            if len(response) < 1000:
+                orderId = False
+            else:
+                orderId = response[-1]["orderId"]
+    return new_orders
 
 def fetch_data():
     disable_widgets()
-    all_symbols = fetch_symbols()
+    symbols = fetch_symbols()
+    start_time = get_timestamp()
     create_json_file()
     enable_widgets()
     done()
