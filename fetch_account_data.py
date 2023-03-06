@@ -12,7 +12,7 @@ from tkinter import filedialog
 api_key = None
 secret_key = None
 alias = None
-json = None
+old_data = None
 
 
 def hashing(query_string):
@@ -92,7 +92,7 @@ def check_fields(event):
 
 
 def import_json():
-    global json
+    global old_data
     # Get filename of JSON file
     filename = filedialog.askopenfilename(
         filetypes=[("JSON files", "*.json")]
@@ -101,7 +101,7 @@ def import_json():
         json_file_name = filename
         # Open file & read content as a JSON object
         with open(filename) as file:
-            json = json.load(file)
+            old_data = json.load(file)
             # Change button text to file name
             import_button.config(text=json_file_name.split("/")[-1])
 
