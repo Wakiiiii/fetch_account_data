@@ -15,6 +15,8 @@ api_key = None
 secret_key = None
 alias = None
 old_trades = None
+done_button = None
+fetch_thread = None
 
 
 def hashing(query_string):
@@ -151,13 +153,21 @@ def create_json_file(content):
 
 
 def add_done_button():
+    global done_button
     # Create done button (exit)
     done_button = tk.Button(window, text="Done", command=window.destroy)
     done_button.grid(row=4, column=1, columnspan=2, padx=5, pady=5)
     done_button.config(state="normal")
 
 
+
 def add_progress_bar():
+    # Destroy done button if exists
+    global done_button
+    if done_button is not None:
+        done_button.destroy()
+        done_button = None
+    # Create progress bar 
     progress_bar = ttk.Progressbar(window, orient="horizontal", mode="determinate", maximum=100)
     progress_bar.grid(row=4, column=1, padx=5, pady=5)
     progress_bar["value"] = 0  # Set the initial value of the progress bar to 0%
@@ -166,6 +176,11 @@ def add_progress_bar():
 
 def update_progress_bar(progress_bar, percent_fetched):
     progress_bar.configure(value=int(percent_fetched))
+
+
+def on_closing():
+    window.destroy()
+    os._exit(0)
 
 
 def remove_duplicates(list):
@@ -204,8 +219,6 @@ def fetch_symbols(time_max):
     for j in symbols:
         time_share = (j["time_since"] / total_time) * 100
         j["time_share"] = time_share
-    for k in symbols:
-        print(k)
     return symbols
 
 
@@ -273,8 +286,11 @@ def fetch_orders(trades, time_max):
 
 
 def fetch_data_button():
-    t = threading.Thread(target=lambda: fetch_data())
-    t.start()
+    global fetch_thread
+    if fetch_thread is None or not fetch_thread.is_alive():
+        fetch_thread = threading.Thread(target=lambda: fetch_data())
+        fetch_thread.start()
+
 
 
 def fetch_data():
@@ -334,6 +350,8 @@ fetch_button.config(state="disabled")
 # Bind function to KeyRelease event of Entry widgets
 api_key_line.bind("<KeyRelease>", check_fields)
 secret_key_line.bind("<KeyRelease>", check_fields)
+# Kill when red cross clicked
+window.protocol("WM_DELETE_WINDOW", on_closing)
 
 # Start event loop
 window.mainloop()
