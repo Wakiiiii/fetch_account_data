@@ -10,11 +10,12 @@ import tkinter as tk
 from tkinter import ttk
 from tkinter import filedialog
 
+BINANCE_API_URL = "https://fapi.binance.com"
 
 api_key = None
 secret_key = None
 alias = None
-old_trades = None
+old_data = None
 done_button = None
 fetch_thread = None
 
@@ -62,7 +63,7 @@ def send_signed_request(http_method, url_path, payload=None):
             else:
                 query_string = "timestamp={}".format(get_timestamp())
             url = (
-                "https://fapi.binance.com" + url_path + "?" + query_string
+                BINANCE_API_URL + url_path + "?" + query_string
                 + "&signature=" + hashing(query_string)
             )
             params = {"url": url, "params": {}}
@@ -111,7 +112,7 @@ def check_fields(event):
 
 
 def import_json():
-    global json
+    global old_data
     # Get filename of JSON file
     filename = filedialog.askopenfilename(
         filetypes=[("JSON files", "*.json")]
@@ -160,7 +161,6 @@ def add_done_button():
     done_button.config(state="normal")
 
 
-
 def add_progress_bar():
     # Destroy done button if exists
     global done_button
@@ -183,17 +183,17 @@ def on_closing():
     os._exit(0)
 
 
-def remove_duplicates(list):
+def remove_duplicates(list_a):
     new_list = []
-    for i in list:
+    for i in list_a:
         if i not in new_list:
             new_list.append(i)
     return new_list
 
 
-def cut_after(list, time_max):
+def cut_after(list_a, time_max):
     new_list = []
-    for i in list:
+    for i in list_a:
         if i["time"] <= time_max:
             new_list.append(i)
         else:
@@ -290,7 +290,6 @@ def fetch_data_button():
     if fetch_thread is None or not fetch_thread.is_alive():
         fetch_thread = threading.Thread(target=lambda: fetch_data())
         fetch_thread.start()
-
 
 
 def fetch_data():
