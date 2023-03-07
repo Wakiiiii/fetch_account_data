@@ -156,7 +156,7 @@ def add_done_button():
     global done_button
     # Create done button (exit)
     done_button = tk.Button(window, text="Done", command=window.destroy)
-    done_button.grid(row=4, column=1, columnspan=2, padx=5, pady=5)
+    done_button.grid(row=5, column=1, columnspan=2, padx=5, pady=5)
     done_button.config(state="normal")
 
 
@@ -314,10 +314,10 @@ window.title("Fetch Account Data")
 screen_width = window.winfo_screenwidth()
 screen_height = window.winfo_screenheight()
 center_x = int(screen_width / 2 - 150)
-center_y = int(screen_height / 2 - 100)
+center_y = int(screen_height / 2 - 110)
 
 # Set size & window position
-window.geometry(f'300x200+{center_x}+{center_y}')
+window.geometry(f'300x220+{center_x}+{center_y}')
 window.resizable(0, 0)  # Resize OFF
 
 # Add GUI elements
