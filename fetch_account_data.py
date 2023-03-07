@@ -1,18 +1,20 @@
-import tkinter as tk
 import hashlib
 import hmac
 import requests
 import time
 import json
 import os
+import threading
 from urllib.parse import urlencode
+import tkinter as tk
+from tkinter import ttk
 from tkinter import filedialog
 
 
 api_key = None
 secret_key = None
 alias = None
-old_data = None
+old_trades = None
 
 
 def hashing(query_string):
@@ -43,23 +45,37 @@ def dispatch_request(http_method):
 
 
 def send_signed_request(http_method, url_path, payload=None):
-    # Send signed request to binance
-    if payload is None:
-        payload = {}
-    query_string = urlencode(payload)
-    # Replace single quote to double quote
-    query_string = query_string.replace("%27", "%22")
-    if query_string:
-        query_string = "{}&timestamp={}".format(query_string, get_timestamp())
-    else:
-        query_string = "timestamp={}".format(get_timestamp())
-    url = (
-        "https://fapi.binance.com" + url_path + "?" + query_string
-        + "&signature=" + hashing(query_string)
-    )
-    params = {"url": url, "params": {}}
-    response = dispatch_request(http_method)(**params)
-    return response
+    retry_count = 0
+    max_retries = 60
+    while retry_count < max_retries:
+        try:
+            # Send signed request to binance
+            if payload is None:
+                payload = {}
+            query_string = urlencode(payload)
+            # Replace single quote to double quote
+            query_string = query_string.replace("%27", "%22")
+            if query_string:
+                query_string = "{}&timestamp={}".format(query_string, get_timestamp())
+            else:
+                query_string = "timestamp={}".format(get_timestamp())
+            url = (
+                "https://fapi.binance.com" + url_path + "?" + query_string
+                + "&signature=" + hashing(query_string)
+            )
+            params = {"url": url, "params": {}}
+            response = dispatch_request(http_method)(**params)
+            print(response)
+            print(response.json())
+            return response
+        except (
+            requests.exceptions.ConnectTimeout, requests.exceptions.RetryError
+            ) as e:
+            print(f"Encountered error: {e}. Retrying in {1} seconds...")
+            time.sleep(1)
+            retry_count += 1
+    # If all retries failed, raise the last error encountered
+    raise e
 
 
 def verify_keys():
@@ -92,7 +108,7 @@ def check_fields(event):
 
 
 def import_json():
-    global old_data
+    global json
     # Get filename of JSON file
     filename = filedialog.askopenfilename(
         filetypes=[("JSON files", "*.json")]
@@ -101,7 +117,7 @@ def import_json():
         json_file_name = filename
         # Open file & read content as a JSON object
         with open(filename) as file:
-            old_data = json.load(file)
+            json = json.load(file)
             # Change button text to file name
             import_button.config(text=json_file_name.split("/")[-1])
 
@@ -122,7 +138,7 @@ def enable_widgets():
     fetch_button.config(state="normal")
 
 
-def create_json_file(content=None):
+def create_json_file(content):
     # Get user desktop path
     desktop_path = os.path.join(os.path.expanduser("~"), "Desktop")
     # Create new json file on desktop
@@ -131,7 +147,6 @@ def create_json_file(content=None):
     # Dump content
     with open(file_path, "w") as file:
         json.dump(content, file)
-    print("JSON file created: {}".format(file_path))
 
 
 def done():
@@ -139,6 +154,24 @@ def done():
     done_button = tk.Button(window, text="Done", command=window.destroy)
     done_button.grid(row=4, column=1, columnspan=2, padx=5, pady=5)
     done_button.config(state="normal")
+
+
+def remove_duplicates(list):
+    new_list = []
+    for i in list:
+        if i not in new_list:
+            new_list.append(i)
+    return new_list
+
+
+def cut_after(list, time_max):
+    new_list = []
+    for i in list:
+        if i["time"] <= time_max:
+            new_list.append(i)
+        else:
+            break
+    return new_list
 
 
 def fetch_symbols():
@@ -153,40 +186,78 @@ def fetch_symbols():
     return symbols
 
 
-def fetch_orders(symbols, time_max):
-    new_orders = []
+def fetch_trades(symbols, time_max):
+    new_trades = []
     for i in symbols:
         symbol = i["symbol"]
         startTime = i["last_time"]
         endTime = startTime + (7 * 24 * 60 * 60 * 1000)
-        orderId = None
-        while orderId is None:
+        fromId = None
+        while fromId is None:
             if endTime > time_max:
                 endTime = time_max
-                orderId = False
-            response = send_signed_request("GET", "/fapi/v1/allOrders",
-                                           {"symbol": symbol, "startTime": startTime,"endTime": endTime, "limit": 1})
-            response = response.json()
-            if len(response) > 0:
-                orderId = response[0]["orderId"]
-            startTime = endTime
-            endTime = startTime + (7 * 24 * 60 * 60 * 1000)
-        while orderId is not False:
-            response = send_signed_request("GET", "/fapi/v1/allOrders",
-                                           {"symbol": symbol, "orderId": orderId, "limit": 1000})
-            response = response.json()
-            new_orders += response
-            if len(response) < 1000:
-                orderId = False
-            else:
-                orderId = response[-1]["orderId"]
+                fromId = False
+            response = send_signed_request("GET", "/fapi/v1/userTrades",
+                                           {"symbol": symbol, "startTime": startTime, "endTime": endTime, "limit": 1, "recWindow": 60000})
+            if response.status_code == 200:
+                response = response.json()
+                if len(response) > 0:
+                    fromId = response[0]["id"]
+                else:
+                    startTime = endTime
+                    endTime = startTime + (7 * 24 * 60 * 60 * 1000)
+        while fromId is not False:
+            response = send_signed_request("GET", "/fapi/v1/userTrades",
+                                           {"symbol": symbol, "fromId": fromId, "limit": 1000, "recWindow": 60000})
+            if response.status_code == 200:
+                response = response.json()
+                new_trades += response
+                if len(response) < 1000:
+                    fromId = False
+                else:
+                    fromId = response[-1]["id"]
+    new_trades = sorted(new_trades, key=lambda x: int(x["time"]))
+    new_trades = remove_duplicates(new_trades)
+    new_trades = cut_after(new_trades, time_max)
+    return new_trades
+
+
+def fetch_orders(trades, time_max):
+    already_seen = []
+    new_orders = []
+    for i in trades:
+        symbol = i["symbol"]
+        orderId = i["orderId"]
+        if symbol not in already_seen:
+            already_seen.append(symbol)
+            while orderId is not False:
+                response = send_signed_request("GET", "/fapi/v1/allOrders",
+                                {"symbol": symbol, "orderId": orderId, "limit": 1000, "recWindow": 60000})
+                if response.status_code == 200:
+                    response = response.json()
+                    new_orders += response
+                    if len(response) < 1000:
+                        orderId = False
+                    else:
+                        orderId = response[-1]["orderId"]
+    new_orders = sorted(new_orders, key=lambda x: int(x["time"]))
+    new_orders = remove_duplicates(new_orders)
+    new_orders = cut_after(new_orders, time_max)
     return new_orders
+
+
+def fetch_data_button():
+    t = threading.Thread(target=lambda: fetch_data())
+    t.start()
+
 
 def fetch_data():
     disable_widgets()
     symbols = fetch_symbols()
     start_time = get_timestamp()
-    create_json_file()
+    new_trades = fetch_trades(symbols, start_time)
+    new_orders = fetch_orders(new_trades, start_time)
+    create_json_file({"orders": new_orders, "trades": new_trades})
     enable_widgets()
     done()
 
@@ -222,7 +293,7 @@ import_button = tk.Button(window, text="Import", command=import_json)
 import_button.grid(row=2, column=1, padx=0, pady=0)
 
 fetch_button = tk.Button(window, text="Fetch Data",
-                         fg="red", command=fetch_data)
+                         fg="red", command=fetch_data_button)
 fetch_button.grid(row=3, column=1, padx=5, pady=5)
 
 message_label = tk.Label(window, text="")
