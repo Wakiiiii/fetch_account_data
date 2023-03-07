@@ -102,9 +102,10 @@ def check_fields(event):
     global api_key, secret_key
     # Check if both API key & Secret key have values
     if api_key_line.get() and secret_key_line.get():
-        api_key = api_key_line.get()
-        secret_key = secret_key_line.get()
-        verify_keys()
+        if api_key != api_key_line.get() or secret_key != secret_key_line.get():
+            api_key = api_key_line.get()
+            secret_key = secret_key_line.get()
+            verify_keys()
 
 
 def import_json():
@@ -149,11 +150,22 @@ def create_json_file(content):
         json.dump(content, file)
 
 
-def done():
+def add_done_button():
     # Create done button (exit)
     done_button = tk.Button(window, text="Done", command=window.destroy)
     done_button.grid(row=4, column=1, columnspan=2, padx=5, pady=5)
     done_button.config(state="normal")
+
+
+def add_progress_bar():
+    progress_bar = ttk.Progressbar(window, orient="horizontal", mode="determinate", maximum=100)
+    progress_bar.grid(row=4, column=1, padx=5, pady=5)
+    progress_bar["value"] = 0  # Set the initial value of the progress bar to 0%
+    return progress_bar
+
+
+def update_progress_bar(progress_bar, percent_fetched):
+    progress_bar.configure(value=int(percent_fetched))
 
 
 def remove_duplicates(list):
@@ -174,23 +186,35 @@ def cut_after(list, time_max):
     return new_list
 
 
-def fetch_symbols():
+def fetch_symbols(time_max):
     # Fetch all symbols from binance futures
     symbols = []
+    total_time = 0
     response = send_signed_request("GET", "/fapi/v1/exchangeInfo")
     response = response.json()
     for i in response["symbols"]:
+        symbol = i["symbol"]
+        listing_time = i["onboardDate"]
+        time_since = time_max - listing_time
+        total_time += time_since
         symbols.append(
-            {"symbol": i["symbol"], "last_time": i["onboardDate"]}
+            {"symbol": symbol, "listing_time": listing_time,
+             "time_since": time_since, "time_share": None}
         )
+    for j in symbols:
+        time_share = (j["time_since"] / total_time) * 100
+        j["time_share"] = time_share
+    for k in symbols:
+        print(k)
     return symbols
 
 
-def fetch_trades(symbols, time_max):
+def fetch_trades(symbols, time_max, progress_bar):
     new_trades = []
+    percent_fetched = 0
     for i in symbols:
         symbol = i["symbol"]
-        startTime = i["last_time"]
+        startTime = i["listing_time"]
         endTime = startTime + (7 * 24 * 60 * 60 * 1000)
         fromId = None
         while fromId is None:
@@ -216,6 +240,8 @@ def fetch_trades(symbols, time_max):
                     fromId = False
                 else:
                     fromId = response[-1]["id"]
+        percent_fetched += i["time_share"]
+        update_progress_bar(progress_bar, percent_fetched)
     new_trades = sorted(new_trades, key=lambda x: int(x["time"]))
     new_trades = remove_duplicates(new_trades)
     new_trades = cut_after(new_trades, time_max)
@@ -253,13 +279,15 @@ def fetch_data_button():
 
 def fetch_data():
     disable_widgets()
-    symbols = fetch_symbols()
     start_time = get_timestamp()
-    new_trades = fetch_trades(symbols, start_time)
+    symbols = fetch_symbols(start_time)
+    progress_bar = add_progress_bar()
+    new_trades = fetch_trades(symbols, start_time, progress_bar)
     new_orders = fetch_orders(new_trades, start_time)
     create_json_file({"orders": new_orders, "trades": new_trades})
+    progress_bar.destroy()
     enable_widgets()
-    done()
+    add_done_button()
 
 
 # Create window & set title
