@@ -126,20 +126,11 @@ def import_json():
             import_button.config(text=json_file_name.split("/")[-1])
 
 
-def disable_widgets():
-    # Disable all widgets
-    api_key_line.config(state="disabled")
-    secret_key_line.config(state="disabled")
-    import_button.config(state="disabled")
-    fetch_button.config(state="disabled")
-
-
-def enable_widgets():
-    # Enable all widgets
-    api_key_line.config(state="normal")
-    secret_key_line.config(state="normal")
-    import_button.config(state="normal")
-    fetch_button.config(state="normal")
+def onoff_widgets(state):
+    api_key_line.config(state=state)
+    secret_key_line.config(state=state)
+    import_button.config(state=state)
+    fetch_button.config(state=state)
 
 
 def create_json_file(content):
@@ -293,7 +284,7 @@ def fetch_data_button():
 
 
 def fetch_data():
-    disable_widgets()
+    onoff_widgets("disabled")
     start_time = get_timestamp()
     symbols = fetch_symbols(start_time)
     progress_bar = add_progress_bar()
@@ -301,7 +292,7 @@ def fetch_data():
     new_orders = fetch_orders(new_trades, start_time)
     create_json_file({"orders": new_orders, "trades": new_trades})
     progress_bar.destroy()
-    enable_widgets()
+    onoff_widgets("normal")
     add_done_button()
 
 
