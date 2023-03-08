@@ -121,7 +121,7 @@ def import_json():
         json_file_name = filename
         # Open file & read content as a JSON object
         with open(filename) as file:
-            json = json.load(file)
+            old_data = json.load(file)
             # Change button text to file name
             import_button.config(text=json_file_name.split("/")[-1])
 
