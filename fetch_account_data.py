@@ -64,8 +64,6 @@ def send_signed_request(http_method, url_path, payload=None):
             )
             params = {"url": url, "params": {}}
             response = dispatch_request(http_method)(**params)
-            print(response)
-            print(response.json())
             return response
         except (
             requests.exceptions.ConnectTimeout, requests.exceptions.RetryError
@@ -97,16 +95,14 @@ def verify_keys():
 
 
 def verify_import(imported_json, alias):
-    try:
-        if imported_json["trades"]:
-            pass
-        if imported_json["orders"]:
-            pass
-        if not (imported_json["alias"] == alias):
-            message_label.config(text="JSON doesn't match keys", fg="red")
-            return False
-    except KeyError:
+    if not isinstance(imported_json, dict) or ("alias" not in imported_json or
+                                                "trades" not in imported_json or
+                                                "orders" not in imported_json):
         message_label.config(text="JSON format is invalid", fg="red")
+        return False
+    if imported_json["alias"] != alias:
+        message_label.config(text="JSON doesn't match keys", fg="red")
+        return False
     message_label.config(text="")
     return True
 
@@ -164,7 +160,7 @@ def add_progress_bar():
         done_button = None
     progress_bar = ttk.Progressbar(
         window, orient="horizontal", mode="determinate", maximum=100
-        )
+    )
     progress_bar.grid(row=4, column=1, padx=5, pady=5)
     progress_bar["value"] = 0
     return progress_bar
@@ -204,9 +200,9 @@ def fetch_symbols(time_max):
         time_since = time_max - listing_time
         total_time += time_since
         item = {
-            "symbol": symbol, "listing_time": listing_time,"time_since": time_since,
+            "symbol": symbol, "listing_time": listing_time, "time_since": time_since,
             "time_share": None, "time_cum": total_time
-            }
+        }
         symbols.append(item)
     for item in symbols:
         item["time_share"] = (item["time_since"] / total_time) * 100
@@ -241,17 +237,21 @@ def from_json(imported_json, time_max):
                     symbol_trades.append(trade_2)
             fromId = symbol_trades[-1]["id"]
             orderId = symbol_trades[-1]["orderId"]
-            trades += from_id(symbol, "id", fromId, "/fapi/v1/userTrades")
-            orders += from_id(symbol, "orderId", orderId, "/fapi/v1/allOrders")
-    account_data = {"trades": edit(trades, time_max), "orders": edit(orders, time_max)}
+            trades += from_id(symbol, "id", fromId, "fromId",
+                              "/fapi/v1/userTrades")
+            orders += from_id(symbol, "orderId", orderId,
+                              "orderId", "/fapi/v1/allOrders")
+    account_data = {
+        "trades": edit(trades, time_max), "orders": edit(orders, time_max)
+    }
     return account_data, already_seen
 
 
-
-def from_id(symbol, key_id, value_id, url):
+def from_id(symbol, key_id, value_id, param, url):
     symbol_data = []
     while value_id is not False:
-        params = {"symbol": symbol, key_id: value_id, "limit": 1000, "recWindow": 60000}
+        params = {"symbol": symbol, param: value_id,
+                  "limit": 1000, "recWindow": 60000}
         response = send_signed_request("GET", url, params)
         if response.status_code == 200:
             response = response.json()
@@ -283,15 +283,20 @@ def fetch_data(symbols, time_max, progress_bar, imported_json):
                 params = {
                     "symbol": symbol, "startTime": startTime,
                     "endTime": endTime, "limit": 1, "recWindow": 60000
-                    }
-                response = send_signed_request("GET", "/fapi/v1/userTrades", params)
+                }
+                response = send_signed_request(
+                    "GET", "/fapi/v1/userTrades", params)
                 if response.status_code == 200:
                     response = response.json()
                     if len(response) > 0:
                         fromId = response[0]["id"]
                         orderId = response[0]["orderId"]
-                        account_data["trades"] += from_id(symbol, "id", fromId, "/fapi/v1/userTrades")
-                        account_data["orders"] += from_id(symbol, "orderId", orderId, "/fapi/v1/allOrders")
+                        account_data["trades"] += from_id(
+                            symbol, "id", fromId, "fromId", "/fapi/v1/userTrades"
+                        )
+                        account_data["orders"] += from_id(
+                            symbol, "orderId", orderId, "orderId", "/fapi/v1/allOrders"
+                        )
                     else:
                         startTime = endTime
                         endTime = startTime + (7 * 24 * 60 * 60 * 1000)
@@ -300,7 +305,7 @@ def fetch_data(symbols, time_max, progress_bar, imported_json):
         "alias": alias,
         "trades": edit(account_data["trades"], time_max),
         "orders": edit(account_data["orders"], time_max)
-        }
+    }
     return final_account_data
 
 
@@ -345,7 +350,7 @@ import_button.grid(row=2, column=1, padx=0, pady=0)
 
 fetch_button = tk.Button(
     window, text="Fetch Data", fg="red", command=fetch_data_button
-    )
+)
 fetch_button.grid(row=3, column=1, padx=5, pady=5)
 
 message_label = tk.Label(window, text="")
