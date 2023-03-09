@@ -15,7 +15,7 @@ BINANCE_API_URL = "https://fapi.binance.com"
 api_key = None
 secret_key = None
 alias = None
-imported_json = {"alias": None, "trades": [], "orders": []}
+imported_json = {"alias": alias, "trades": [], "orders": []}
 done_button = None
 fetch_thread = None
 
@@ -96,7 +96,7 @@ def verify_keys():
         fetch_button.config(state="disabled")
 
 
-def verify_import(imported_json):
+def verify_import(imported_json, alias):
     try:
         if imported_json["trades"]:
             pass
@@ -107,6 +107,7 @@ def verify_import(imported_json):
             return False
     except KeyError:
         message_label.config(text="JSON format is invalid", fg="red")
+    message_label.config(text="")
     return True
 
 
@@ -120,17 +121,17 @@ def check_fields(event):
 
 
 def import_json_button():
-    global imported_json
+    global imported_json, alias
     filename = filedialog.askopenfilename(
         filetypes=[("JSON files", "*.json")]
     )
     if filename:
         with open(filename) as file:
             imported_json = json.load(file)
-        if verify_import(imported_json):
+        if verify_import(imported_json, alias):
             import_button.config(text=filename.split("/")[-1])
         else:
-            imported_json = {"alias": None, "trades": [], "orders": []}
+            imported_json = {"alias": alias, "trades": [], "orders": []}
 
 
 def onoff_widgets(state):
@@ -151,7 +152,6 @@ def create_json_file(content):
 
 
 def add_done_button():
-    global done_button
     done_button = tk.Button(window, text="Done", command=on_closing)
     done_button.grid(row=4, column=1, columnspan=2, padx=5, pady=5)
     done_button.config(state="normal")
@@ -175,22 +175,22 @@ def on_closing():
     os._exit(0)
 
 
-def remove_duplicates(list_a):
-    new_list = []
-    for i in list_a:
-        if i not in new_list:
-            new_list.append(i)
-    return new_list
+def get_unique_data(data):
+    unique_data = []
+    for item in data:
+        if item not in unique_data:
+            unique_data.append(item)
+    return unique_data
 
 
-def cut_after(list_a, time_max):
-    new_list = []
-    for i in list_a:
-        if i["time"] <= time_max:
-            new_list.append(i)
+def cut_after(data, time_max):
+    new_data = []
+    for item in data:
+        if item["time"] <= time_max:
+            new_data.append(item)
         else:
             break
-    return new_list
+    return new_data
 
 
 def fetch_symbols(time_max):
@@ -198,20 +198,19 @@ def fetch_symbols(time_max):
     total_time = 0
     response = send_signed_request("GET", "/fapi/v1/exchangeInfo")
     response = response.json()
-    for i in response["symbols"]:
-        symbol = i["symbol"]
-        listing_time = i["onboardDate"]
+    for item in response["symbols"]:
+        symbol = item["symbol"]
+        listing_time = item["onboardDate"]
         time_since = time_max - listing_time
         total_time += time_since
         item = {
             "symbol": symbol, "listing_time": listing_time,"time_since": time_since,
-            "time_share": None, "time_cum":None
+            "time_share": None, "time_cum": total_time
             }
         symbols.append(item)
-    for j in symbols:
-        j["time_share"] = (j["time_since"] / total_time) * 100
-    for k in range(1, len(symbols)):
-        symbols[k]["time_cum"] = symbols[k-1]["time_share"] + symbols[k]["time_share"]
+    for item in symbols:
+        item["time_share"] = (item["time_since"] / total_time) * 100
+        item["time_cum"] = (item["time_cum"] / total_time) * 100
     return symbols
 
 
@@ -222,72 +221,31 @@ def fetch_data_button():
         fetch_thread.start()
 
 
-def edit(list_a, time_max):
-    list_a = sorted(list_a, key=lambda x: int(x["time"]))
-    list_a = remove_duplicates(list_a)
-    list_a = cut_after(list_a, time_max)
-    return list_a
+def edit(data, time_max):
+    sorted_data = sorted(data, key=lambda x: int(x["time"]))
+    cut_data = cut_after(get_unique_data(sorted_data), time_max)
+    return cut_data
 
 
-def from_json(imported_json):
+def from_json(imported_json, time_max):
     already_seen = []
     trades = imported_json["trades"]
     orders = imported_json["orders"]
-    for i in imported_json["trades"]:
-        symbol = i["symbol"]
+    for trade_1 in imported_json["trades"]:
+        symbol = trade_1["symbol"]
         symbol_trades = []
         if symbol not in already_seen:
             already_seen.append(symbol)
-            for j in imported_json["trades"]:
-                if j["symbol"] == symbol:
-                    symbol_trades.append(j)
+            for trade_2 in imported_json["trades"]:
+                if trade_2["symbol"] == symbol:
+                    symbol_trades.append(trade_2)
             fromId = symbol_trades[-1]["id"]
             orderId = symbol_trades[-1]["orderId"]
             trades += from_id(symbol, "id", fromId, "/fapi/v1/userTrades")
             orders += from_id(symbol, "orderId", orderId, "/fapi/v1/allOrders")
-    data = {"trades": trades, "orders": orders}
-    return data, already_seen
+    account_data = {"trades": edit(trades, time_max), "orders": edit(orders, time_max)}
+    return account_data, already_seen
 
-
-def fetch_data(symbols, time_max, progress_bar, imported_json):
-    global alias
-    data, already_seen = from_json(imported_json)
-    percent_fetched = 0
-    for i in symbols:
-        symbol = i["symbol"]
-        if len(imported_json["orders"]) > 0:
-            startTime = imported_json["orders"][-1]["time"]
-        startTime = i["listing_time"]
-        endTime = startTime + (7 * 24 * 60 * 60 * 1000)
-        fromId = None
-        if symbol not in already_seen:
-            while fromId is None:
-                if endTime > time_max:
-                    endTime = time_max
-                    fromId = False
-                params = {
-                    "symbol": symbol, "startTime": startTime,
-                    "endTime": endTime, "limit": 1, "recWindow": 60000
-                    }
-                response = send_signed_request("GET", "/fapi/v1/userTrades", params)
-                if response.status_code == 200:
-                    response = response.json()
-                    if len(response) > 0:
-                        fromId = response[0]["id"]
-                        orderId = response[0]["orderId"]
-                    else:
-                        startTime = endTime
-                        endTime = startTime + (7 * 24 * 60 * 60 * 1000)
-        data["trades"] += from_id(symbol, "id", fromId, "/fapi/v1/userTrades")
-        data["trades"] += from_id(symbol, "orderId", orderId, "/fapi/v1/allOrders")
-        percent_fetched = i["time_cum"]
-        progress_bar.configure(value=int(percent_fetched))
-    data = {
-        "alias": alias,
-        "trades": edit(data["trades"], time_max),
-        "orders": edit(data["orders"], time_max)
-        }
-    return data
 
 
 def from_id(symbol, key_id, value_id, url):
@@ -305,13 +263,54 @@ def from_id(symbol, key_id, value_id, url):
     return symbol_data
 
 
+def fetch_data(symbols, time_max, progress_bar, imported_json):
+    account_data, already_seen = from_json(imported_json, time_max)
+    for item in symbols:
+        symbol = item["symbol"]
+        if len(imported_json["orders"]) > 0:
+            imported_json["trades"] = edit(imported_json["trades"], time_max)
+            imported_json["orders"] = edit(imported_json["orders"], time_max)
+            startTime = imported_json["orders"][-1]["time"]
+        else:
+            startTime = item["listing_time"]
+        endTime = startTime + (7 * 24 * 60 * 60 * 1000)
+        fromId = None
+        if symbol not in already_seen:
+            while fromId is None:
+                if endTime > time_max:
+                    endTime = time_max
+                    fromId = False
+                params = {
+                    "symbol": symbol, "startTime": startTime,
+                    "endTime": endTime, "limit": 1, "recWindow": 60000
+                    }
+                response = send_signed_request("GET", "/fapi/v1/userTrades", params)
+                if response.status_code == 200:
+                    response = response.json()
+                    if len(response) > 0:
+                        fromId = response[0]["id"]
+                        orderId = response[0]["orderId"]
+                        account_data["trades"] += from_id(symbol, "id", fromId, "/fapi/v1/userTrades")
+                        account_data["orders"] += from_id(symbol, "orderId", orderId, "/fapi/v1/allOrders")
+                    else:
+                        startTime = endTime
+                        endTime = startTime + (7 * 24 * 60 * 60 * 1000)
+        progress_bar.configure(value=int(item["time_cum"]))
+    final_account_data = {
+        "alias": alias,
+        "trades": edit(account_data["trades"], time_max),
+        "orders": edit(account_data["orders"], time_max)
+        }
+    return final_account_data
+
+
 def main_process():
     onoff_widgets("disabled")
     start_time = get_timestamp()
     symbols = fetch_symbols(start_time)
     progress_bar = add_progress_bar()
-    data = fetch_data(symbols, start_time, progress_bar)
-    create_json_file(data)
+    account_data = fetch_data(symbols, start_time, progress_bar, imported_json)
+    create_json_file(account_data)
     progress_bar.destroy()
     onoff_widgets("normal")
     add_done_button()
