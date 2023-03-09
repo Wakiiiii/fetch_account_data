@@ -15,7 +15,7 @@ BINANCE_API_URL = "https://fapi.binance.com"
 api_key = None
 secret_key = None
 alias = None
-old_data = None
+imported_json = None
 done_button = None
 fetch_thread = None
 
@@ -77,7 +77,7 @@ def send_signed_request(http_method, url_path, payload=None):
             print(f"Encountered error: {e}. Retrying in {1} seconds...")
             time.sleep(1)
             retry_count += 1
-    # If all retries failed, raise the last error encountered
+    # If all retries failed raise the last error encountered
     raise e
 
 
@@ -101,6 +101,20 @@ def verify_keys():
         fetch_button.config(state="disabled")
 
 
+def verify_import(imported_json):
+    try:
+        if imported_json["trades"]:
+            pass
+        if imported_json["orders"]:
+            pass
+        if not (imported_json["alias"] == alias):
+            message_label.config(text="JSON doesn't match keys", fg="red")
+            return False
+    except KeyError:
+            message_label.config(text="JSON format is invalid", fg="red")
+    return True
+
+
 def check_fields(event):
     global api_key, secret_key
     # Check if both API key & Secret key have values
@@ -111,19 +125,22 @@ def check_fields(event):
             verify_keys()
 
 
-def import_json():
-    global old_data
+def import_json_button():
+    global imported_json
     # Get filename of JSON file
     filename = filedialog.askopenfilename(
         filetypes=[("JSON files", "*.json")]
     )
     if filename:
-        json_file_name = filename
         # Open file & read content as a JSON object
         with open(filename) as file:
-            old_data = json.load(file)
+            imported_json = json.load(file)
+        if verify_import(imported_json):
             # Change button text to file name
+            json_file_name = filename
             import_button.config(text=json_file_name.split("/")[-1])
+        else:
+            imported_json = None
 
 
 def onoff_widgets(state):
@@ -163,10 +180,6 @@ def add_progress_bar():
     progress_bar.grid(row=4, column=1, padx=5, pady=5)
     progress_bar["value"] = 0  # Set the initial value of the progress bar to 0%
     return progress_bar
-
-
-def update_progress_bar(progress_bar, percent_fetched):
-    progress_bar.configure(value=int(percent_fetched))
 
 
 def on_closing():
@@ -213,8 +226,16 @@ def fetch_symbols(time_max):
     return symbols
 
 
-def fetch_trades(symbols, time_max, progress_bar):
-    new_trades = []
+def fetch_data_button():
+    global fetch_thread
+    if fetch_thread is None or not fetch_thread.is_alive():
+        fetch_thread = threading.Thread(target=lambda: main_process())
+        fetch_thread.start()
+
+
+def fetch_data(symbols, time_max, progress_bar):
+    trades = []
+    orders = []
     percent_fetched = 0
     for i in symbols:
         symbol = i["symbol"]
@@ -231,66 +252,42 @@ def fetch_trades(symbols, time_max, progress_bar):
                 response = response.json()
                 if len(response) > 0:
                     fromId = response[0]["id"]
+                    orderId = response[0]["orderId"]
                 else:
                     startTime = endTime
                     endTime = startTime + (7 * 24 * 60 * 60 * 1000)
-        while fromId is not False:
-            response = send_signed_request("GET", "/fapi/v1/userTrades",
-                                           {"symbol": symbol, "fromId": fromId, "limit": 1000, "recWindow": 60000})
-            if response.status_code == 200:
-                response = response.json()
-                new_trades += response
-                if len(response) < 1000:
-                    fromId = False
-                else:
-                    fromId = response[-1]["id"]
+        trades += from_id(symbol, "id", fromId, "/fapi/v1/userTrades")
+        orders += from_id(symbol, "orderId", orderId, "/fapi/v1/allOrders")
         percent_fetched += i["time_share"]
-        update_progress_bar(progress_bar, percent_fetched)
-    new_trades = sorted(new_trades, key=lambda x: int(x["time"]))
-    new_trades = remove_duplicates(new_trades)
-    new_trades = cut_after(new_trades, time_max)
-    return new_trades
+        progress_bar.configure(value=int(percent_fetched))
+    trades = sorted(trades, key=lambda x: int(x["time"]))
+    trades = remove_duplicates(trades)
+    trades = cut_after(trades, time_max)
+    return trades
 
 
-def fetch_orders(trades, time_max):
-    already_seen = []
-    new_orders = []
-    for i in trades:
-        symbol = i["symbol"]
-        orderId = i["orderId"]
-        if symbol not in already_seen:
-            already_seen.append(symbol)
-            while orderId is not False:
-                response = send_signed_request("GET", "/fapi/v1/allOrders",
-                                {"symbol": symbol, "orderId": orderId, "limit": 1000, "recWindow": 60000})
-                if response.status_code == 200:
-                    response = response.json()
-                    new_orders += response
-                    if len(response) < 1000:
-                        orderId = False
-                    else:
-                        orderId = response[-1]["orderId"]
-    new_orders = sorted(new_orders, key=lambda x: int(x["time"]))
-    new_orders = remove_duplicates(new_orders)
-    new_orders = cut_after(new_orders, time_max)
-    return new_orders
+def from_id(symbol, key_id, value_id, url):
+    symbol_data = []
+    while value_id is not False:
+        response = send_signed_request("GET", url,
+                        {"symbol": symbol, key_id: value_id, "limit": 1000, "recWindow": 60000})
+        if response.status_code == 200:
+            response = response.json()
+            symbol_data += response
+            if len(response) < 1000:
+                value_id = False
+            else:
+                value_id = response[-1][key_id]
+    return symbol_data
 
 
-def fetch_data_button():
-    global fetch_thread
-    if fetch_thread is None or not fetch_thread.is_alive():
-        fetch_thread = threading.Thread(target=lambda: fetch_data())
-        fetch_thread.start()
-
-
-def fetch_data():
+def main_process():
     onoff_widgets("disabled")
     start_time = get_timestamp()
     symbols = fetch_symbols(start_time)
     progress_bar = add_progress_bar()
-    new_trades = fetch_trades(symbols, start_time, progress_bar)
-    new_orders = fetch_orders(new_trades, start_time)
-    create_json_file({"orders": new_orders, "trades": new_trades})
+    new_data = fetch_data(symbols, start_time, progress_bar)
+    create_json_file(new_data)
     progress_bar.destroy()
     onoff_widgets("normal")
     add_done_button()
@@ -323,7 +320,7 @@ secret_key_line.grid(row=1, column=1, padx=0, pady=0)
 
 json_file_label = tk.Label(window, text='JSON file:')
 json_file_label.grid(row=2, column=0, padx=5, pady=5)
-import_button = tk.Button(window, text="Import", command=import_json)
+import_button = tk.Button(window, text="Import", command=import_json_button)
 import_button.grid(row=2, column=1, padx=0, pady=0)
 
 fetch_button = tk.Button(window, text="Fetch Data",
