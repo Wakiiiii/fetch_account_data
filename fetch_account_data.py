@@ -35,10 +35,8 @@ def get_timestamp():
 def dispatch_request(http_method):
     session = requests.Session()
     session.headers.update(
-        {"Content-Type": "application/json;charset=utf-8",
-         "X-MBX-APIKEY": api_key}
+        {"Content-Type": "application/json;charset=utf-8", "X-MBX-APIKEY": api_key}
     )
-
     return {
         "GET": session.get,
         "DELETE": session.delete,
@@ -49,14 +47,11 @@ def dispatch_request(http_method):
 
 def send_signed_request(http_method, url_path, payload=None):
     retry_count = 0
-    max_retries = 60
-    while retry_count < max_retries:
+    while retry_count < 60:
         try:
-            # Send signed request to binance
             if payload is None:
                 payload = {}
             query_string = urlencode(payload)
-            # Replace single quote to double quote
             query_string = query_string.replace("%27", "%22")
             if query_string:
                 query_string = "{}&timestamp={}".format(
@@ -84,7 +79,6 @@ def send_signed_request(http_method, url_path, payload=None):
 
 def verify_keys():
     global alias
-    # Check if keys match binance futures account
     response = send_signed_request("GET", "/fapi/v2/balance")
     # Successful
     if response.status_code == 200:
@@ -118,7 +112,6 @@ def verify_import(imported_json):
 
 def check_fields(event):
     global api_key, secret_key
-    # Check if both API key & Secret key have values
     if api_key_line.get() and secret_key_line.get():
         if api_key != api_key_line.get() or secret_key != secret_key_line.get():
             api_key = api_key_line.get()
@@ -128,12 +121,10 @@ def check_fields(event):
 
 def import_json_button():
     global imported_json
-    # Get filename of JSON file
     filename = filedialog.askopenfilename(
         filetypes=[("JSON files", "*.json")]
     )
     if filename:
-        # Open file & read content as a JSON object
         with open(filename) as file:
             imported_json = json.load(file)
         if verify_import(imported_json):
@@ -155,30 +146,26 @@ def create_json_file(content):
     # Create new json file on desktop
     file_name = "{}.json".format(str(time.time()).replace(".", ""))
     file_path = os.path.join(desktop_path, file_name)
-    # Dump content
     with open(file_path, "w") as file:
         json.dump(content, file)
 
 
 def add_done_button():
     global done_button
-    # Create done button (exit)
-    done_button = tk.Button(window, text="Done", command=window.destroy)
+    done_button = tk.Button(window, text="Done", command=on_closing)
     done_button.grid(row=4, column=1, columnspan=2, padx=5, pady=5)
     done_button.config(state="normal")
 
 
 def add_progress_bar():
-    # Destroy done button if exists
     global done_button
     if done_button is not None:
         done_button.destroy()
         done_button = None
-    # Create progress bar
     progress_bar = ttk.Progressbar(
-        window, orient="horizontal", mode="determinate", maximum=100)
+        window, orient="horizontal", mode="determinate", maximum=100
+        )
     progress_bar.grid(row=4, column=1, padx=5, pady=5)
-    # Set the initial value of the progress bar to 0%
     progress_bar["value"] = 0
     return progress_bar
 
@@ -207,7 +194,6 @@ def cut_after(list_a, time_max):
 
 
 def fetch_symbols(time_max):
-    # Fetch all symbols from binance futures
     symbols = []
     total_time = 0
     response = send_signed_request("GET", "/fapi/v1/exchangeInfo")
@@ -218,13 +204,14 @@ def fetch_symbols(time_max):
         time_since = time_max - listing_time
         total_time += time_since
         item = {
-            "symbol": symbol, "listing_time": listing_time,
-            "time_since": time_since, "time_share": None
+            "symbol": symbol, "listing_time": listing_time,"time_since": time_since,
+            "time_share": None, "time_cum":None
             }
         symbols.append(item)
     for j in symbols:
-        time_share = (j["time_since"] / total_time) * 100
-        j["time_share"] = time_share
+        j["time_share"] = (j["time_since"] / total_time) * 100
+    for k in range(1, len(symbols)):
+        symbols[k]["time_cum"] = symbols[k-1]["time_share"] + symbols[k]["time_share"]
     return symbols
 
 
@@ -242,37 +229,64 @@ def edit(list_a, time_max):
     return list_a
 
 
-def fetch_data(symbols, time_max, progress_bar):
-    trades = []
-    orders = []
+def from_json(imported_json):
+    already_seen = []
+    trades = imported_json["trades"]
+    orders = imported_json["orders"]
+    for i in imported_json["trades"]:
+        symbol = i["symbol"]
+        symbol_trades = []
+        if symbol not in already_seen:
+            already_seen.append(symbol)
+            for j in imported_json["trades"]:
+                if j["symbol"] == symbol:
+                    symbol_trades.append(j)
+            fromId = symbol_trades[-1]["id"]
+            orderId = symbol_trades[-1]["orderId"]
+            trades += from_id(symbol, "id", fromId, "/fapi/v1/userTrades")
+            orders += from_id(symbol, "orderId", orderId, "/fapi/v1/allOrders")
+    data = {"trades": trades, "orders": orders}
+    return data, already_seen
+
+
+def fetch_data(symbols, time_max, progress_bar, imported_json):
+    global alias
+    data, already_seen = from_json(imported_json)
     percent_fetched = 0
     for i in symbols:
         symbol = i["symbol"]
+        if len(imported_json["orders"]) > 0:
+            startTime = imported_json["orders"][-1]["time"]
         startTime = i["listing_time"]
         endTime = startTime + (7 * 24 * 60 * 60 * 1000)
         fromId = None
-        while fromId is None:
-            if endTime > time_max:
-                endTime = time_max
-                fromId = False
-            params = {
-                "symbol": symbol, "startTime": startTime,
-                "endTime": endTime, "limit": 1, "recWindow": 60000
-                }
-            response = send_signed_request("GET", "/fapi/v1/userTrades", params)
-            if response.status_code == 200:
-                response = response.json()
-                if len(response) > 0:
-                    fromId = response[0]["id"]
-                    orderId = response[0]["orderId"]
-                else:
-                    startTime = endTime
-                    endTime = startTime + (7 * 24 * 60 * 60 * 1000)
-        trades += from_id(symbol, "id", fromId, "/fapi/v1/userTrades")
-        orders += from_id(symbol, "orderId", orderId, "/fapi/v1/allOrders")
-        percent_fetched += i["time_share"]
+        if symbol not in already_seen:
+            while fromId is None:
+                if endTime > time_max:
+                    endTime = time_max
+                    fromId = False
+                params = {
+                    "symbol": symbol, "startTime": startTime,
+                    "endTime": endTime, "limit": 1, "recWindow": 60000
+                    }
+                response = send_signed_request("GET", "/fapi/v1/userTrades", params)
+                if response.status_code == 200:
+                    response = response.json()
+                    if len(response) > 0:
+                        fromId = response[0]["id"]
+                        orderId = response[0]["orderId"]
+                    else:
+                        startTime = endTime
+                        endTime = startTime + (7 * 24 * 60 * 60 * 1000)
+        data["trades"] += from_id(symbol, "id", fromId, "/fapi/v1/userTrades")
+        data["trades"] += from_id(symbol, "orderId", orderId, "/fapi/v1/allOrders")
+        percent_fetched = i["time_cum"]
         progress_bar.configure(value=int(percent_fetched))
-    data = {"alias": alias, "trades": edit(trades, time_max), "orders": edit(orders, time_max)}
+    data = {
+        "alias": alias,
+        "trades": edit(data["trades"], time_max),
+        "orders": edit(data["orders"], time_max)
+        }
     return data
 
 
@@ -296,8 +310,8 @@ def main_process():
     start_time = get_timestamp()
     symbols = fetch_symbols(start_time)
     progress_bar = add_progress_bar()
-    new_data = fetch_data(symbols, start_time, progress_bar)
-    create_json_file(new_data)
+    data = fetch_data(symbols, start_time, progress_bar)
+    create_json_file(data)
     progress_bar.destroy()
     onoff_widgets("normal")
     add_done_button()
@@ -306,17 +320,14 @@ def main_process():
 # Create window & set title
 window = tk.Tk()
 window.title("Fetch Account Data")
-
 # Get screen dimensions & calculate center coordinates
 screen_width = window.winfo_screenwidth()
 screen_height = window.winfo_screenheight()
 center_x = int(screen_width / 2 - 150)
 center_y = int(screen_height / 2 - 100)
-
 # Set size & window position
 window.geometry(f'300x200+{center_x}+{center_y}')
 window.resizable(0, 0)  # Resize OFF
-
 # Add GUI elements
 api_key_label = tk.Label(window, text='API Key:')
 api_key_label.grid(row=0, column=0, padx=5, pady=5)
@@ -333,22 +344,20 @@ json_file_label.grid(row=2, column=0, padx=5, pady=5)
 import_button = tk.Button(window, text="Import", command=import_json_button)
 import_button.grid(row=2, column=1, padx=0, pady=0)
 
-fetch_button = tk.Button(window, text="Fetch Data",
-                         fg="red", command=fetch_data_button)
+fetch_button = tk.Button(
+    window, text="Fetch Data", fg="red", command=fetch_data_button
+    )
 fetch_button.grid(row=3, column=1, padx=5, pady=5)
 
 message_label = tk.Label(window, text="")
 message_label.grid(row=4, column=1, columnspan=2, padx=5, pady=5)
-
 # Disable the import & fetch buttons initially
 import_button.config(state="disabled")
 fetch_button.config(state="disabled")
-
 # Bind function to KeyRelease event of Entry widgets
 api_key_line.bind("<KeyRelease>", check_fields)
 secret_key_line.bind("<KeyRelease>", check_fields)
 # Kill when red cross clicked
 window.protocol("WM_DELETE_WINDOW", on_closing)
 
-# Start event loop
 window.mainloop()
