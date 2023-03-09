@@ -15,7 +15,7 @@ BINANCE_API_URL = "https://fapi.binance.com"
 api_key = None
 secret_key = None
 alias = None
-imported_json = None
+imported_json = {"alias": None, "trades": [], "orders": []}
 done_button = None
 fetch_thread = None
 
@@ -59,7 +59,8 @@ def send_signed_request(http_method, url_path, payload=None):
             # Replace single quote to double quote
             query_string = query_string.replace("%27", "%22")
             if query_string:
-                query_string = "{}&timestamp={}".format(query_string, get_timestamp())
+                query_string = "{}&timestamp={}".format(
+                    query_string, get_timestamp())
             else:
                 query_string = "timestamp={}".format(get_timestamp())
             url = (
@@ -73,7 +74,7 @@ def send_signed_request(http_method, url_path, payload=None):
             return response
         except (
             requests.exceptions.ConnectTimeout, requests.exceptions.RetryError
-            ) as e:
+        ) as e:
             print(f"Encountered error: {e}. Retrying in {1} seconds...")
             time.sleep(1)
             retry_count += 1
@@ -111,7 +112,7 @@ def verify_import(imported_json):
             message_label.config(text="JSON doesn't match keys", fg="red")
             return False
     except KeyError:
-            message_label.config(text="JSON format is invalid", fg="red")
+        message_label.config(text="JSON format is invalid", fg="red")
     return True
 
 
@@ -136,11 +137,9 @@ def import_json_button():
         with open(filename) as file:
             imported_json = json.load(file)
         if verify_import(imported_json):
-            # Change button text to file name
-            json_file_name = filename
-            import_button.config(text=json_file_name.split("/")[-1])
+            import_button.config(text=filename.split("/")[-1])
         else:
-            imported_json = None
+            imported_json = {"alias": None, "trades": [], "orders": []}
 
 
 def onoff_widgets(state):
@@ -165,7 +164,7 @@ def add_done_button():
     global done_button
     # Create done button (exit)
     done_button = tk.Button(window, text="Done", command=window.destroy)
-    done_button.grid(row=5, column=1, columnspan=2, padx=5, pady=5)
+    done_button.grid(row=4, column=1, columnspan=2, padx=5, pady=5)
     done_button.config(state="normal")
 
 
@@ -175,10 +174,12 @@ def add_progress_bar():
     if done_button is not None:
         done_button.destroy()
         done_button = None
-    # Create progress bar 
-    progress_bar = ttk.Progressbar(window, orient="horizontal", mode="determinate", maximum=100)
+    # Create progress bar
+    progress_bar = ttk.Progressbar(
+        window, orient="horizontal", mode="determinate", maximum=100)
     progress_bar.grid(row=4, column=1, padx=5, pady=5)
-    progress_bar["value"] = 0  # Set the initial value of the progress bar to 0%
+    # Set the initial value of the progress bar to 0%
+    progress_bar["value"] = 0
     return progress_bar
 
 
@@ -216,10 +217,11 @@ def fetch_symbols(time_max):
         listing_time = i["onboardDate"]
         time_since = time_max - listing_time
         total_time += time_since
-        symbols.append(
-            {"symbol": symbol, "listing_time": listing_time,
-             "time_since": time_since, "time_share": None}
-        )
+        item = {
+            "symbol": symbol, "listing_time": listing_time,
+            "time_since": time_since, "time_share": None
+            }
+        symbols.append(item)
     for j in symbols:
         time_share = (j["time_since"] / total_time) * 100
         j["time_share"] = time_share
@@ -231,6 +233,13 @@ def fetch_data_button():
     if fetch_thread is None or not fetch_thread.is_alive():
         fetch_thread = threading.Thread(target=lambda: main_process())
         fetch_thread.start()
+
+
+def edit(list_a, time_max):
+    list_a = sorted(list_a, key=lambda x: int(x["time"]))
+    list_a = remove_duplicates(list_a)
+    list_a = cut_after(list_a, time_max)
+    return list_a
 
 
 def fetch_data(symbols, time_max, progress_bar):
@@ -246,8 +255,11 @@ def fetch_data(symbols, time_max, progress_bar):
             if endTime > time_max:
                 endTime = time_max
                 fromId = False
-            response = send_signed_request("GET", "/fapi/v1/userTrades",
-                                           {"symbol": symbol, "startTime": startTime, "endTime": endTime, "limit": 1, "recWindow": 60000})
+            params = {
+                "symbol": symbol, "startTime": startTime,
+                "endTime": endTime, "limit": 1, "recWindow": 60000
+                }
+            response = send_signed_request("GET", "/fapi/v1/userTrades", params)
             if response.status_code == 200:
                 response = response.json()
                 if len(response) > 0:
@@ -260,17 +272,15 @@ def fetch_data(symbols, time_max, progress_bar):
         orders += from_id(symbol, "orderId", orderId, "/fapi/v1/allOrders")
         percent_fetched += i["time_share"]
         progress_bar.configure(value=int(percent_fetched))
-    trades = sorted(trades, key=lambda x: int(x["time"]))
-    trades = remove_duplicates(trades)
-    trades = cut_after(trades, time_max)
-    return trades
+    data = {"alias": alias, "trades": edit(trades, time_max), "orders": edit(orders, time_max)}
+    return data
 
 
 def from_id(symbol, key_id, value_id, url):
     symbol_data = []
     while value_id is not False:
-        response = send_signed_request("GET", url,
-                        {"symbol": symbol, key_id: value_id, "limit": 1000, "recWindow": 60000})
+        params = {"symbol": symbol, key_id: value_id, "limit": 1000, "recWindow": 60000}
+        response = send_signed_request("GET", url, params)
         if response.status_code == 200:
             response = response.json()
             symbol_data += response
@@ -301,10 +311,10 @@ window.title("Fetch Account Data")
 screen_width = window.winfo_screenwidth()
 screen_height = window.winfo_screenheight()
 center_x = int(screen_width / 2 - 150)
-center_y = int(screen_height / 2 - 110)
+center_y = int(screen_height / 2 - 100)
 
 # Set size & window position
-window.geometry(f'300x220+{center_x}+{center_y}')
+window.geometry(f'300x200+{center_x}+{center_y}')
 window.resizable(0, 0)  # Resize OFF
 
 # Add GUI elements
