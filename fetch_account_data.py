@@ -2,6 +2,7 @@ import hashlib
 import hmac
 import requests
 import time
+import datetime
 import json
 import os
 import threading
@@ -137,11 +138,18 @@ def onoff_widgets(state):
     fetch_button.config(state=state)
 
 
-def create_json_file(content):
+def ms_to_dt(ms):
+    # converts time since epoch in ms into dateime str (UTC)
+    dt = datetime.datetime.utcfromtimestamp(ms / 1000)
+    return dt.strftime("%Y-%m-%d_%H:%M:%S")
+
+
+def create_json_file(content, time_start):
     # Get user desktop path
     desktop_path = os.path.join(os.path.expanduser("~"), "Desktop")
     # Create new json file on desktop
-    file_name = "{}.json".format(str(time.time()).replace(".", ""))
+    date_time_name = ms_to_dt(time_start)
+    file_name = date_time_name + ".json"
     file_path = os.path.join(desktop_path, file_name)
     with open(file_path, "w") as file:
         json.dump(content, file)
@@ -311,11 +319,11 @@ def fetch_data(symbols, time_max, progress_bar, imported_json):
 
 def main_process():
     onoff_widgets("disabled")
-    start_time = get_timestamp()
-    symbols = fetch_symbols(start_time)
+    time_start = get_timestamp()
+    symbols = fetch_symbols(time_start)
     progress_bar = add_progress_bar()
-    account_data = fetch_data(symbols, start_time, progress_bar, imported_json)
-    create_json_file(account_data)
+    account_data = fetch_data(symbols, time_start, progress_bar, imported_json)
+    create_json_file(account_data, time_start)
     progress_bar.destroy()
     onoff_widgets("normal")
     add_done_button()
