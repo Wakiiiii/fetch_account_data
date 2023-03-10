@@ -156,6 +156,7 @@ def create_json_file(content, time_start):
 
 
 def add_done_button():
+    global done_button
     done_button = tk.Button(window, text="Done", command=on_closing)
     done_button.grid(row=4, column=1, columnspan=2, padx=5, pady=5)
     done_button.config(state="normal")
@@ -318,15 +319,21 @@ def fetch_data(symbols, time_max, progress_bar, imported_json):
 
 
 def main_process():
-    onoff_widgets("disabled")
-    time_start = get_timestamp()
-    symbols = fetch_symbols(time_start)
-    progress_bar = add_progress_bar()
-    account_data = fetch_data(symbols, time_start, progress_bar, imported_json)
-    create_json_file(account_data, time_start)
-    progress_bar.destroy()
-    onoff_widgets("normal")
-    add_done_button()
+    try:
+        message_label.config(text="")
+        onoff_widgets("disabled")
+        time_start = get_timestamp()
+        symbols = fetch_symbols(time_start)
+        progress_bar = add_progress_bar()
+        account_data = fetch_data(symbols, time_start, progress_bar, imported_json)
+        create_json_file(account_data, time_start)
+        progress_bar.destroy()
+        onoff_widgets("normal")
+        add_done_button()
+    except:
+        progress_bar.destroy()
+        message_label.config(text="Something went wrong", fg="red")
+        
 
 
 # Create window & set title
